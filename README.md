@@ -32,13 +32,13 @@ cd home4paws
 API_KEY = your_api_key_here
 ```
 
-##Build and Run
+## Build and Run
 
 ```terminal
 cargo run
 ```
 
-###Tech Stack
+### Tech Stack
 
 - Language: Rust
 - GUI Framework: egui via eframe
@@ -46,7 +46,7 @@ cargo run
 - JSON Parsing: serde and serde_json
 - Environment Config: dotenv
 
-##Inspiration
+## Inspiration
 
 This project was created to combine my interest in software development with a meaningful cause
 helping people discover and adopt pets from shelters. It also serves as a hands-on learning
