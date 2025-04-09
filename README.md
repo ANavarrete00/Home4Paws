@@ -24,7 +24,7 @@ git clone https://github.com/ANavarrete00/home4paws.git
 cd home4paws
 ```
 
-## API Key
+### API Key
 
 - retrive an API from https://www.petfinder.com/developers/
 - Create a .env file in the project root and add your API key:
@@ -32,13 +32,13 @@ cd home4paws
 API_KEY = your_api_key_here
 ```
 
-## Build and Run
+### Build and Run
 
 ```terminal
 cargo run
 ```
 
-### Tech Stack
+## Tech Stack
 
 - Language: Rust
 - GUI Framework: egui via eframe
