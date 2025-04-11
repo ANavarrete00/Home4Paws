@@ -30,6 +30,7 @@ cd home4paws
 - Create a .env file in the project root and add your API key:
 ```env
 API_KEY = your_api_key_here
+API_TOKEN = your_token_here
 ```
 
 ### Build and Run
