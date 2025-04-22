@@ -1,9 +1,9 @@
 #[path = "utils/petfinder.rs"]
 mod petfinder;
-use petfinder::{get_token, get_near_animals};
+
+use petfinder::get_token;
 use eframe::egui;
 use dotenv::dotenv;
-use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,23 +25,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     //get api token
-    let token = get_token(&client_id, &client_secret).await?;
-    
+    //let token = get_token(&client_id, &client_secret).await?;
+    let token_status = match get_token(&client_id, &client_secret).await {
+        Ok(_) => "Token retrived successfully!".to_string(),
+        Err(e) => format!("Failed to get token: {}", e),
+    };
+
     let options = eframe::NativeOptions::default();
-    let _ = eframe::run_native("Home4Paws",
+    let _ = eframe::run_native(
+        "Home4Paws",
         options,
-        Box::new(|cc| Ok(Box::new(Home4PawsApp::new(cc))))
+        Box::new(|cc| Ok(Box::new(Home4PawsApp::new(cc, token_status))))
     ).map_err(|err| println!("{:?}", err));
 
     Ok(())
 }
 
+//create a fetch function after user enters location and other filters.
+/*async fetch_animal() {
+
+    Ok(())
+} */
+
 #[derive(Default)]
-struct Home4PawsApp {}
+struct Home4PawsApp {
+    status_message: String,
+}
 
 impl Home4PawsApp {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self{
-        Self::default()
+    fn new(_cc: &eframe::CreationContext<'_>, status_message: String) -> Self{
+        Self{ status_message }
     }
 }
 
@@ -50,6 +63,8 @@ impl eframe::App for Home4PawsApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("🐾 Home4Paws - Adopt a New Friend");
             ui.label("This will display adoptable pets from an API.");
+            ui.separator();
+            ui.label(&self.status_message);
         });
     }
 }

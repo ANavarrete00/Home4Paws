@@ -25,7 +25,7 @@ pub async fn get_token(client_id: &str, client_secret: &str) -> Result<String, B
     Ok(token)
 }
 
-pub async fn get_near_animals(location: &str, token: &str, page: u32) -> Result<(), Box<dyn Error>> {
+/*pub async fn get_near_animals(location: &str, token: &str, page: u32) -> Result<(), Box<dyn Error>> {
     let url = format!(
         "https://api.petfinder.com/v2/animals?location={}&page={}",
         location, page
@@ -57,4 +57,4 @@ pub async fn get_near_animals(location: &str, token: &str, page: u32) -> Result<
     }
 
     Ok(())
-}
+}*/
