@@ -7,6 +7,7 @@ pub struct AnimalData {
     pub name: String,
     pub breed: String,
     pub description: String,
+    pub photo_url: Option<String>,
 }
 
 //function retrives token from petfinders api. This token will be used to access api effecently.
@@ -60,7 +61,10 @@ pub async fn get_near_animals(location: &str, token: &str, page: u32) -> Result<
             let name = animal["name"].as_str().unwrap_or("Unnamed").to_string();
             let breed = animal["breeds"]["primary"].as_str().unwrap_or("Unknown").to_string();
             let description = animal["description"].as_str().unwrap_or("No description").to_string();
-            animals.push(AnimalData { name, breed, description });
+            let photo_url = animal["photos"]
+                .as_array().and_then(|photos| photos.first())
+                .and_then(|photo| photo["medium"].as_str()).map(|s| s.to_string());
+            animals.push(AnimalData { name, breed, description, photo_url });
         }
     } else {
         println!("No animals found.");
