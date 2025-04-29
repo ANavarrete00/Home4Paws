@@ -26,7 +26,7 @@ cd home4paws
 
 ### API Key
 
-- retrive an API from https://www.petfinder.com/developers/
+- retrive an API from https://www.petfinder.com/developers/ by creating an account.
 - Create a .env file in the project root and add your API key:
 ```env
 API_KEY = your_api_key_here
