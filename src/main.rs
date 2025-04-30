@@ -46,7 +46,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
 
-    let options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_maximized(true),
+        ..Default::default()
+    };
     let _ = eframe::run_native(
         "Home4Paws",
         options,
@@ -75,7 +78,7 @@ struct Home4PawsApp {
 impl Home4PawsApp {
     fn new(_cc: &eframe::CreationContext<'_>, animals: Vec<AnimalData>, token: String) -> Self{
         Self{ 
-            location: "City/State or Zip".to_owned(),
+            location: "City, State or Zip".to_owned(),
             animals,
             loaded_images: HashMap::default(),
             token,
@@ -128,29 +131,41 @@ impl eframe::App for Home4PawsApp {
                 
                 //groups each animal with the animals information.
                 for animal in &self.animals {
-                    ui.group(|ui| {                        
-                        ui.label(format!("Name: {}", animal.name));
-                        ui.label(format!("Breed: {}", animal.breed));
-                        ui.label(format!("Description: {}", animal.description));
+                    ui.group(|ui| {        
+                        ui.horizontal(|ui| {
 
-                        if let Some(photo_url) = &animal.photo_url {
-                            if let Some(texture) = self.loaded_images.get(photo_url) {
-                                ui.image(texture);
-                            }
-                            else {
-                                if let Ok(bytes) = load_image_bytes(photo_url) {
-                                    if let Ok(color_image) = load_color_image_from_bytes(&bytes) {
-                                        let texture = ctx.load_texture(
-                                            photo_url.clone(),
-                                            color_image,
-                                            egui::TextureOptions::default(),
-                                        );
-                                        self.loaded_images.insert(photo_url.clone(), texture.clone());
-                                        ui.image(&texture);
+                            //animal info for UI
+                            ui.vertical(|ui|{
+                                ui.label(format!("Name: {}", animal.name));
+                                ui.label(format!("Breed: {}", animal.breed));
+                                ui.label(format!("Description: {}", animal.description));
+                            });
+
+                            //photo section
+                            if let Some(photo_url) = &animal.photo_url {
+                                //a set scale for photo sizes
+                                let photo_size = egui::vec2(300.0, 300.0);
+
+                                if let Some(texture) = self.loaded_images.get(photo_url) {
+                                    //ui.image(texture);
+                                    ui.add(egui::Image::new(texture).fit_to_exact_size(photo_size));
+
+                                }
+                                else {
+                                    if let Ok(bytes) = load_image_bytes(photo_url) {
+                                        if let Ok(color_image) = load_color_image_from_bytes(&bytes) {
+                                            let texture = ctx.load_texture(
+                                                photo_url.clone(),
+                                                color_image,
+                                                egui::TextureOptions::default(),
+                                            );
+                                            self.loaded_images.insert(photo_url.clone(), texture.clone());
+                                            ui.add(egui::Image::new(&texture).fit_to_exact_size(photo_size));
+                                        }
                                     }
                                 }
                             }
-                        }
+                        });    //ui horiz    
                     });
                 }
                 //buttons to change page number
