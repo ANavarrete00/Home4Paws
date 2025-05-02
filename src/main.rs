@@ -117,19 +117,12 @@ impl eframe::App for Home4PawsApp {
                             eprint!("Send error: {}", e);
                         })
                     });
-                    /*let animals = rt.block_on(async{
-                        get_near_animals(&location, &token, 1).await
-                    });
-                    
-                    match animals {
-                        Ok(new_animals) => {
-                            self.animals = new_animals;
-                            self.loaded_images.clear();
-                        }
-                        Err(e) => {
-                            eprint!("failed to fetch animals: {}", e);
-                        }
-                    }*/
+                };
+                
+                //Indicates loading
+                if self.loading {
+                    ui.label("Loading animals...");
+                    ui.spinner();
                 };
             });
 
@@ -152,10 +145,7 @@ impl eframe::App for Home4PawsApp {
                 }
             }
             
-            //Indicates loading
-            if self.loading {
-                ui.label("Loading animals...");
-            };
+            
 
             //create a scroll-able area to view all the animals.
             egui::ScrollArea::vertical()
@@ -171,7 +161,17 @@ impl eframe::App for Home4PawsApp {
                             ui.vertical(|ui|{
                                 ui.label(format!("Name: {}", animal.name));
                                 ui.label(format!("Breed: {}", animal.breed));
+                                ui.label(format!("Age: {}", animal.age));
+                                ui.label(format!("Size: {}", animal.size));
                                 ui.label(format!("Description: {}", animal.description));
+                                ui.label(format!("Location: {}, {}", animal.city, animal.state));
+
+                                if animal.url != "Unkown" {
+                                    ui.hyperlink_to("Learn more about me!", animal.url.clone());
+                                }
+                                else{
+                                    ui.label(format!("URL: {}", animal.url));
+                                }
                             });
 
                             //photo section

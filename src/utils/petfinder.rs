@@ -10,6 +10,8 @@ pub struct AnimalData {
     pub age: String,
     pub size: String,
     pub url: String,
+    pub city: String,
+    pub state: String,
     pub gw_children: bool,
     pub gw_dogs: bool,
     pub gw_cats: bool,
@@ -71,15 +73,17 @@ pub async fn get_near_animals(location: &str, token: &str, page: u32) -> Result<
             let size = animal["size"].as_str().unwrap_or("Unknown").to_string();
             let url = animal["url"].as_str().unwrap_or("Unknown").to_string();
             let description = animal["description"].as_str().unwrap_or("No description").to_string();
+            let city = animal["contact"]["address"]["city"].as_str().unwrap_or("Unknown").to_string();
+            let state = animal["contact"]["address"]["state"].as_str().unwrap_or("Unkown").to_string();
 
-            let gw_children = animal["gw_children"].as_bool().unwrap_or(false);
-            let gw_dogs = animal["age"].as_bool().unwrap_or(false);
-            let gw_cats = animal["age"].as_bool().unwrap_or(false);
+            let gw_children = animal["good_with_children"].as_bool().unwrap_or(false);
+            let gw_dogs = animal["good_with_dogs"].as_bool().unwrap_or(false);
+            let gw_cats = animal["good_with_cats"].as_bool().unwrap_or(false);
 
             let photo_url = animal["photos"]
                 .as_array().and_then(|photos| photos.first())
                 .and_then(|photo| photo["medium"].as_str()).map(|s| s.to_string());
-            animals.push(AnimalData { name, breed, description, age, size, url, gw_children, gw_dogs, gw_cats, photo_url });
+            animals.push(AnimalData { name, breed, description, age, size, url, gw_children, gw_dogs, gw_cats, photo_url, city, state });
         }
     } else {
         println!("No animals found.");
