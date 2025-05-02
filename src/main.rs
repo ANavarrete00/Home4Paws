@@ -2,7 +2,7 @@
 mod petfinder;
 #[path = "utils/imageloader.rs"]
 mod imageloader;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::mpsc};
 
 use petfinder::{ get_near_animals, get_token, AnimalData };
 use imageloader::{ load_image_bytes, load_color_image_from_bytes };
@@ -73,6 +73,7 @@ struct Home4PawsApp {
     loaded_images: HashMap<String, TextureHandle>,
     token: String,
     loading: bool,
+    receiver: Option<mpsc::Receiver<Result<Vec<AnimalData>, String>>>,
 }
 
 impl Home4PawsApp {
@@ -83,6 +84,7 @@ impl Home4PawsApp {
             loaded_images: HashMap::default(),
             token,
             loading: false,
+            receiver: None,
         }
     }
 }
@@ -95,13 +97,27 @@ impl eframe::App for Home4PawsApp {
 
             //Search section
             ui.horizontal(|ui| {
+                //text box for searching location
                 ui.text_edit_singleline(&mut self.location);
+                //button to trigger search
                 if ui.button("Search").clicked() {
+                    //self.loading = true;
+                    let (sender, receiver) = mpsc::channel();
+                    self.receiver = Some(receiver);
+                    self.loading = true;
+
                     let location = self.location.clone();
                     let token = self.token.clone();
-                    let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
                     
-                    let animals = rt.block_on(async{
+                    std::thread::spawn(move || {
+                        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                        let result = rt.block_on(get_near_animals(&location, &token, 1))
+                            .map_err(|e| e.to_string());
+                        sender.send(result).unwrap_or_else(|e| {
+                            eprint!("Send error: {}", e);
+                        })
+                    });
+                    /*let animals = rt.block_on(async{
                         get_near_animals(&location, &token, 1).await
                     });
                     
@@ -113,12 +129,29 @@ impl eframe::App for Home4PawsApp {
                         Err(e) => {
                             eprint!("failed to fetch animals: {}", e);
                         }
-                    }
+                    }*/
                 };
             });
 
             ui.separator();
 
+            //Handle results of async thread
+            if let Some(receiver) = &self.receiver {
+                if let Ok(result) = receiver.try_recv() {
+                    self.loading = false;
+                    match result {
+                        Ok(new_animals) => {
+                            self.animals = new_animals;
+                            self.loaded_images.clear();
+                        }
+                        Err(e) => {
+                            eprint!("Failed to fetch animals: {}", e);
+                        }
+                    }
+                    self.receiver = None;
+                }
+            }
+            
             //Indicates loading
             if self.loading {
                 ui.label("Loading animals...");
@@ -165,7 +198,7 @@ impl eframe::App for Home4PawsApp {
                                     }
                                 }
                             }
-                        });    //ui horiz    
+                        });
                     });
                 }
                 //buttons to change page number
