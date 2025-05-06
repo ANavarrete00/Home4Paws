@@ -14,25 +14,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //read and initalize api key/secret.
     dotenv().ok();
     let rt = tokio::runtime::Runtime::new()?;//manual runtime
-    let (client_id, client_secret) = (
-        std::env::var("API_KEY")?,
-        std::env::var("API_SECRET")?,
-    );
-    /*let client_id = match std::env::var("API_KEY") {
-        Ok(val) => val,
-        Err(e) => {
-            eprint!("CLIENT_ID not set: {}", e);
-            return Err(e.into());
-        }
-    };
-
-    let client_secret = match std::env::var("API_SECRET") {
-        Ok(val) => val,
-        Err(e) => {
-            eprint!("CLIENT_SECRET not set: {}", e);
-            return Err(e.into());
-        }
-    };*/
+    let client_id = std::env::var("API_KEY")?;
+    let client_secret = std::env::var("API_SECRET")?;
 
     //get api token
     let token = rt.block_on(get_token(&client_id, &client_secret))?;
@@ -40,6 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //retrive inital page of animals
     let animals = match rt.block_on(get_near_animals("Seattle, WA", &token, 1)) {
         Ok(animals) => animals,
+
         Err(e) => {
             eprint!("Faild to get animals: {}", e);
             Vec::new()
@@ -50,7 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         viewport: egui::ViewportBuilder::default().with_maximized(true),
         ..Default::default()
     };
-    let _ = eframe::run_native(
+
+    eframe::run_native(
         "Home4Paws",
         options,
         Box::new(|cc| {
@@ -73,7 +58,10 @@ struct Home4PawsApp {
     loaded_images: HashMap<String, TextureHandle>,
     token: String,
     loading: bool,
+    start_up: bool,
     receiver: Option<mpsc::Receiver<Result<Vec<AnimalData>, String>>>,
+    image_receiver: Vec<mpsc::Receiver<(String, Option<ColorImage>)>>,
+    images_loading: std::collections::HashSet<String>,
 }
 
 impl Home4PawsApp {
@@ -83,131 +71,171 @@ impl Home4PawsApp {
             animals,
             loaded_images: HashMap::default(),
             token,
-            loading: false,
+            loading: true,
+            start_up: true,
             receiver: None,
+            image_receiver: Vec::new(),
+            images_loading: std::collections::HashSet::new(),
+        }
+    }
+
+    // UI search section.
+    fn draw_search_bar(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.text_edit_singleline(&mut self.location);
+            if ui.button("Search").clicked() {
+                self.loading = true;
+                self.start_animal_search();
+            }
+
+            if self.loading {
+                ui.spinner();
+            }
+        });
+    }
+
+    // Search for more animals. Search button triggered.
+    fn start_animal_search (&mut self) {
+        let (sender, receiver) = mpsc::channel();
+        self.receiver = Some(receiver);
+
+        let location = self.location.clone();
+        let token = self.token.clone();
+        
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            let result = rt.block_on(get_near_animals(&location, &token, 1))
+                .map_err(|e| e.to_string());
+            let _ = sender.send(result);
+        });
+    }
+
+    fn proccess_animal_response(&mut self) {
+        if let Some(reciver) = &self.receiver {
+            if let Ok(result) = reciver.try_recv() {
+                match result {
+                    Ok(new_animals) => self.load_animal_images(new_animals),
+                    Err(e) => eprintln!("Failed to fetch animals: {}", e),
+                }
+                self.receiver = None;
+            }
+        }
+    }
+
+    fn load_animal_images(&mut self, new_animals: Vec<AnimalData>) {
+        self.animals = new_animals;
+        self.loaded_images.clear();
+        self.images_loading.clear();
+        self.image_receiver.clear();
+
+        for animal in &self.animals {
+            if let Some(url) = &animal.photo_url{
+                let url = url.clone();
+                self.images_loading.insert(url.clone());
+
+                let (sender, receiver) = mpsc::channel();
+                self.image_receiver.push(receiver);
+
+                std::thread::spawn(move || {
+                    let result = load_image_bytes(&url)
+                        .ok().and_then(|bytes| load_color_image_from_bytes(&bytes).ok());
+                    let _ = sender.send((url, result));
+                });
+            }
+        }
+    }
+
+    fn proccess_image_receivers(&mut self, ctx: &egui::Context) {
+        //Handle results of all image receivers
+        self.image_receiver.retain_mut(|receiver| {
+            match receiver.try_recv() {
+                Ok((url, Some(image))) => {
+                    let texture = ctx.load_texture(url.clone(), image, egui::TextureOptions::default());
+                    self.loaded_images.insert(url.clone(), texture);
+                    self.images_loading.remove(&url);
+                    false // remove this receiver from the list
+                }
+                Ok((url, None)) => {
+                    eprintln!("Failed to load image from {}", url);
+                    self.images_loading.remove(&url);
+                    false // remove this receiver from the list
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => true,  // keep it
+                Err(_) => false, // drop if disconnected
+            }
+        });
+
+        if self.image_receiver.is_empty() && self.loading {
+            self.loading = false;
+        }
+    }
+
+    fn draw_animal_cards(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let animal_list = self.animals.clone();
+
+        egui::ScrollArea::vertical()
+            .auto_shrink([false; 2])
+            .show(ui, |ui| {
+                for animal in &animal_list {
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            self.draw_animal_info(ui, animal);
+                            self.draw_animal_image(ui, ctx, animal);
+                        });
+                    });
+                }
+
+                ui.horizontal(|ui| {
+                    ui.button("Prev");
+                    ui.button("Next");
+                });
+        });
+    }
+
+    fn draw_animal_info(&self, ui: &mut egui::Ui, animal: &AnimalData) {
+        //animal info for UI
+        ui.vertical(|ui|{
+            ui.label(format!("Name: {}", animal.name));
+            ui.label(format!("Breed: {}", animal.breed));
+            ui.label(format!("Age: {}", animal.age));
+            ui.label(format!("Size: {}", animal.size));
+            ui.label(format!("Description: {}", animal.description));
+            ui.label(format!("Location: {}, {}", animal.city, animal.state));
+
+            if animal.url != "Unkown" {
+                ui.hyperlink_to("Learn more about me!", animal.url.clone());
+            }
+            else{
+                ui.label(format!("URL: {}", animal.url));
+            }
+        });
+    }
+
+    fn draw_animal_image(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, animal: &AnimalData) {
+        if let Some(url) = &animal.photo_url {
+            let photo_size = egui::vec2(300.0, 300.0);
+            if let Some(texture) = self.loaded_images.get(url) {
+                ui.add(egui::Image::new(texture).fit_to_exact_size(photo_size));
+            }
         }
     }
 }
 
 impl eframe::App for Home4PawsApp {
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        
         egui::CentralPanel::default().show(ctx, |ui| {
-
-            ui.heading("Home4Paws - Adopt a New Friend");
-
-            //Search section
-            ui.horizontal(|ui| {
-                //text box for searching location
-                ui.text_edit_singleline(&mut self.location);
-                //button to trigger search
-                if ui.button("Search").clicked() {
-                    //self.loading = true;
-                    let (sender, receiver) = mpsc::channel();
-                    self.receiver = Some(receiver);
-                    self.loading = true;
-
-                    let location = self.location.clone();
-                    let token = self.token.clone();
-                    
-                    std::thread::spawn(move || {
-                        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-                        let result = rt.block_on(get_near_animals(&location, &token, 1))
-                            .map_err(|e| e.to_string());
-                        sender.send(result).unwrap_or_else(|e| {
-                            eprint!("Send error: {}", e);
-                        })
-                    });
-                };
-                
-                //Indicates loading
-                if self.loading {
-                    ui.label("Loading animals...");
-                    ui.spinner();
-                };
-            });
-
-            ui.separator();
-
-            //Handle results of async thread
-            if let Some(receiver) = &self.receiver {
-                if let Ok(result) = receiver.try_recv() {
-                    self.loading = false;
-                    match result {
-                        Ok(new_animals) => {
-                            self.animals = new_animals;
-                            self.loaded_images.clear();
-                        }
-                        Err(e) => {
-                            eprint!("Failed to fetch animals: {}", e);
-                        }
-                    }
-                    self.receiver = None;
-                }
+            if self.start_up {
+                self.load_animal_images(self.animals.clone());
+                self.start_up = false;
             }
-            
-            
-
-            //create a scroll-able area to view all the animals.
-            egui::ScrollArea::vertical()
-            .auto_shrink([false; 2])
-            .show(ui, |ui|{
-                
-                //groups each animal with the animals information.
-                for animal in &self.animals {
-                    ui.group(|ui| {        
-                        ui.horizontal(|ui| {
-
-                            //animal info for UI
-                            ui.vertical(|ui|{
-                                ui.label(format!("Name: {}", animal.name));
-                                ui.label(format!("Breed: {}", animal.breed));
-                                ui.label(format!("Age: {}", animal.age));
-                                ui.label(format!("Size: {}", animal.size));
-                                ui.label(format!("Description: {}", animal.description));
-                                ui.label(format!("Location: {}, {}", animal.city, animal.state));
-
-                                if animal.url != "Unkown" {
-                                    ui.hyperlink_to("Learn more about me!", animal.url.clone());
-                                }
-                                else{
-                                    ui.label(format!("URL: {}", animal.url));
-                                }
-                            });
-
-                            //photo section
-                            if let Some(photo_url) = &animal.photo_url {
-                                //a set scale for photo sizes
-                                let photo_size = egui::vec2(300.0, 300.0);
-
-                                if let Some(texture) = self.loaded_images.get(photo_url) {
-                                    //ui.image(texture);
-                                    ui.add(egui::Image::new(texture).fit_to_exact_size(photo_size));
-
-                                }
-                                else {
-                                    if let Ok(bytes) = load_image_bytes(photo_url) {
-                                        if let Ok(color_image) = load_color_image_from_bytes(&bytes) {
-                                            let texture = ctx.load_texture(
-                                                photo_url.clone(),
-                                                color_image,
-                                                egui::TextureOptions::default(),
-                                            );
-                                            self.loaded_images.insert(photo_url.clone(), texture.clone());
-                                            ui.add(egui::Image::new(&texture).fit_to_exact_size(photo_size));
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    });
-                }
-                //buttons to change page number
-                ui.horizontal_centered(|ui| {
-                    ui.button("Prev"); //implement trigger to change 'page' -1 unless it is 1 already
-                    ui.button("Next"); //implement trigger to change 'page' +1 unless there is not more pages.
-                });
-            });
-            
+            ui.heading("Home4Paws - Adopt a New Friend");
+            self.draw_search_bar(ui);
+            ui.separator();
+            self.proccess_animal_response();
+            self.proccess_image_receivers(ctx);
+            self.draw_animal_cards(ui, ctx);
         });
     }
 }

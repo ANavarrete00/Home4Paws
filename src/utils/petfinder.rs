@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::error::Error;
 
 //structer for animal information
+#[derive(Clone)]
 pub struct AnimalData {
     pub name: String,
     pub breed: String,
