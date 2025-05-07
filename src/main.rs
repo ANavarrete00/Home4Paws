@@ -79,7 +79,7 @@ impl Home4PawsApp {
         }
     }
 
-    // UI search section.
+    // Draws the search bar UI and triggers animal search when clicked.
     fn draw_search_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.location);
@@ -94,7 +94,7 @@ impl Home4PawsApp {
         });
     }
 
-    // Search for more animals. Search button triggered.
+    // Sends an async request to fetch new animal data based on user input.
     fn start_animal_search (&mut self) {
         let (sender, receiver) = mpsc::channel();
         self.receiver = Some(receiver);
@@ -110,6 +110,7 @@ impl Home4PawsApp {
         });
     }
 
+    // Receives and processes the animal search results from the background thread.
     fn proccess_animal_response(&mut self) {
         if let Some(reciver) = &self.receiver {
             if let Ok(result) = reciver.try_recv() {
@@ -122,12 +123,13 @@ impl Home4PawsApp {
         }
     }
 
+    // Replaces the current animal list and begins loading images for the new results.
     fn load_animal_images(&mut self, new_animals: Vec<AnimalData>) {
+        self.loading = true;
         self.animals = new_animals;
         self.loaded_images.clear();
         self.images_loading.clear();
         self.image_receiver.clear();
-        self.loading = true;
 
         for animal in &self.animals {
             if let Some(url) = &animal.photo_url{
@@ -146,6 +148,7 @@ impl Home4PawsApp {
         }
     }
 
+    // Processes completed image downloads and updates the UI with textures.
     fn proccess_image_receivers(&mut self, ctx: &egui::Context) {
         //Handle results of all image receivers
         self.image_receiver.retain_mut(|receiver| {
@@ -171,6 +174,7 @@ impl Home4PawsApp {
         }
     }
 
+    // Displays a scrollable list of animal cards in the UI.
     fn draw_animal_cards(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let animal_list = self.animals.clone();
 
@@ -193,6 +197,7 @@ impl Home4PawsApp {
         });
     }
 
+    // Displays detaild information about a single animal.
     fn draw_animal_info(&self, ui: &mut egui::Ui, animal: &AnimalData) {
         //animal info for UI
         ui.vertical(|ui|{
@@ -212,6 +217,7 @@ impl Home4PawsApp {
         });
     }
 
+    // Renders an individual animal's image if it's been loaded.
     fn draw_animal_image(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, animal: &AnimalData) {
         if let Some(url) = &animal.photo_url {
             let photo_size = egui::vec2(300.0, 300.0);
