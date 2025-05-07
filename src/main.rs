@@ -127,6 +127,7 @@ impl Home4PawsApp {
         self.loaded_images.clear();
         self.images_loading.clear();
         self.image_receiver.clear();
+        self.loading = true;
 
         for animal in &self.animals {
             if let Some(url) = &animal.photo_url{
