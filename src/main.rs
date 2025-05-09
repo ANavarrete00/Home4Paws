@@ -81,16 +81,22 @@ impl Home4PawsApp {
 
     // Draws the search bar UI and triggers animal search when clicked.
     fn draw_search_bar(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.text_edit_singleline(&mut self.location);
-            if ui.button("Search").clicked() {
-                self.loading = true;
-                self.start_animal_search();
-            }
+        ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
+            let width = ui.available_width();
+            let search_width = 400.0;
+            let pad = (width - search_width).max(0.0) /2.0;
+                ui.horizontal_centered(|ui| {
+                    ui.add_space(pad);
+                    ui.text_edit_singleline(&mut self.location);
+                    if ui.button("Search").clicked() {
+                        self.loading = true;
+                        self.start_animal_search();
+                    }
 
-            if self.loading {
-                ui.spinner();
-            }
+                    if self.loading {
+                        ui.spinner();
+                    }
+                });
         });
     }
 
@@ -231,15 +237,16 @@ impl Home4PawsApp {
 impl eframe::App for Home4PawsApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.heading("Home4Paws - Adopt a New Friend");
+            self.draw_search_bar(ui);
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.start_up {
                 self.load_animal_images(self.animals.clone());
                 self.start_up = false;
             }
-            ui.heading("Home4Paws - Adopt a New Friend");
-            self.draw_search_bar(ui);
-            ui.separator();
             self.proccess_animal_response();
             self.proccess_image_receivers(ctx);
             self.draw_animal_cards(ui, ctx);
