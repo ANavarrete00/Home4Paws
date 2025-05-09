@@ -82,9 +82,9 @@ impl Home4PawsApp {
     // Draws the search bar UI and triggers animal search when clicked.
     fn draw_search_bar(&mut self, ui: &mut egui::Ui) {
         ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-            let width = ui.available_width();
+            let window_width = ui.available_width();
             let search_width = 400.0;
-            let pad = (width - search_width).max(0.0) /2.0;
+            let pad = (window_width - search_width).max(0.0) /2.0;
                 ui.horizontal_centered(|ui| {
                     ui.add_space(pad);
                     ui.text_edit_singleline(&mut self.location);
@@ -183,6 +183,7 @@ impl Home4PawsApp {
     // Displays a scrollable list of animal cards in the UI.
     fn draw_animal_cards(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let animal_list = self.animals.clone();
+        let photo_size = ui.available_width() * 0.2;
 
         egui::ScrollArea::vertical()
             .auto_shrink([false; 2])
@@ -191,7 +192,7 @@ impl Home4PawsApp {
                     ui.group(|ui| {
                         ui.horizontal(|ui| {
                             self.draw_animal_info(ui, animal);
-                            self.draw_animal_image(ui, ctx, animal);
+                            self.draw_animal_image(ui, ctx, animal, photo_size);
                         });
                     });
                 }
@@ -224,11 +225,11 @@ impl Home4PawsApp {
     }
 
     // Renders an individual animal's image if it's been loaded.
-    fn draw_animal_image(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, animal: &AnimalData) {
+    fn draw_animal_image(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, animal: &AnimalData, photo_size: f32) {
         if let Some(url) = &animal.photo_url {
-            let photo_size = egui::vec2(300.0, 300.0);
+            let scaled_photo_size = egui::vec2(photo_size, photo_size);
             if let Some(texture) = self.loaded_images.get(url) {
-                ui.add(egui::Image::new(texture).fit_to_exact_size(photo_size));
+                ui.add(egui::Image::new(texture).fit_to_exact_size(scaled_photo_size));
             }
         }
     }
