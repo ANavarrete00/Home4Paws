@@ -10,6 +10,9 @@
 - Built-in API key management (with local environment variable support)
 - First-time Rust + GUI project to explore native app development
 
+## Screenshot
+![alt text](https://github.com/ANavarrete00/Home4Paws/blob/main/src/assets/githubImg.png "Screenshot of app")
+
 ## Getting Started
 
 ### Prerequisites
