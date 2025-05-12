@@ -1,5 +1,5 @@
 use egui::{ Color32, ColorImage };
-use image:: { ImageReader, load_from_memory, ColorType };
+use image::load_from_memory;
 //use image::GenericImageView;
 
 pub fn load_image_bytes(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {

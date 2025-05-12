@@ -19,9 +19,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //get api token
     let token = rt.block_on(get_token(&client_id, &client_secret))?;
+    let location = "San Diego, CA".to_string();
+    let api_page = 1;
 
     //retrive inital page of animals
-    let animals = match rt.block_on(get_near_animals("Seattle, WA", &token, 1)) {
+    let animals = match rt.block_on(get_near_animals(&location, &token, &api_page)) {
         Ok(animals) => animals,
 
         Err(e) => {
@@ -55,8 +57,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 struct Home4PawsApp {
     location: String,
     animals: Vec<AnimalData>,
+    animal_list1: Vec<AnimalData>,
+    animal_list2: Vec<AnimalData>,
     loaded_images: HashMap<String, TextureHandle>,
     token: String,
+    api_page: u32,
+    app_page: u32,
+    list_index: i32,
     loading: bool,
     start_up: bool,
     receiver: Option<mpsc::Receiver<Result<Vec<AnimalData>, String>>>,
@@ -67,10 +74,15 @@ struct Home4PawsApp {
 impl Home4PawsApp {
     fn new(_cc: &eframe::CreationContext<'_>, animals: Vec<AnimalData>, token: String) -> Self{
         Self{ 
-            location: "City, State or Zip".to_owned(),
+            location: Default::default(),
             animals,
+            animal_list1: Vec::new(),
+            animal_list2: Vec::new(),
             loaded_images: HashMap::default(),
             token,
+            api_page: 1,
+            app_page: 1,
+            list_index: 0,
             loading: true,
             start_up: true,
             receiver: None,
@@ -87,9 +99,11 @@ impl Home4PawsApp {
             let pad = (window_width - search_width).max(0.0) /2.0;
                 ui.horizontal_centered(|ui| {
                     ui.add_space(pad);
-                    ui.text_edit_singleline(&mut self.location);
+                    ui.add(egui::TextEdit::singleline(&mut self.location).hint_text("City, State or Zip Code"));
                     if ui.button("Search").clicked() {
                         self.loading = true;
+                        self.app_page = 1;
+                        self.api_page = 1;
                         self.start_animal_search();
                     }
 
@@ -104,13 +118,19 @@ impl Home4PawsApp {
     fn start_animal_search (&mut self) {
         let (sender, receiver) = mpsc::channel();
         self.receiver = Some(receiver);
+        self.loading = true;
 
-        let location = self.location.clone();
+        let mut location = self.location.clone();
         let token = self.token.clone();
-        
+        let api_page = self.api_page;
+
+        if location == "" { // Empty TextEdit box will default to San Diego
+            location = "San Diego, CA".to_string();
+        }
+
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-            let result = rt.block_on(get_near_animals(&location, &token, 1))
+            let result = rt.block_on(get_near_animals(&location, &token, &api_page))
                 .map_err(|e| e.to_string());
             let _ = sender.send(result);
         });
@@ -120,6 +140,7 @@ impl Home4PawsApp {
     fn proccess_animal_response(&mut self) {
         if let Some(reciver) = &self.receiver {
             if let Ok(result) = reciver.try_recv() {
+                println!("Location: '{}', page: {}", self.location, self.api_page);
                 match result {
                     Ok(new_animals) => self.load_animal_images(new_animals),
                     Err(e) => eprintln!("Failed to fetch animals: {}", e),
@@ -127,6 +148,8 @@ impl Home4PawsApp {
                 self.receiver = None;
             }
         }
+        self.animal_list1.clear();
+        self.animal_list2.clear();
     }
 
     // Replaces the current animal list and begins loading images for the new results.
@@ -181,26 +204,67 @@ impl Home4PawsApp {
     }
 
     // Displays a scrollable list of animal cards in the UI.
-    fn draw_animal_cards(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let animal_list = self.animals.clone();
+    fn draw_animal_cards(&mut self, ui: &mut egui::Ui) {
+        let split = self.animals.len() / 2;
+        self.animal_list1 = self.animals.clone();
+        self.animal_list2 = self.animal_list1.split_off(split);
         let photo_size = ui.available_width() * 0.2;
 
+        // Scroll Area where the animals are displayed.
         egui::ScrollArea::vertical()
             .auto_shrink([false; 2])
             .show(ui, |ui| {
-                for animal in &animal_list {
-                    ui.group(|ui| {
-                        ui.horizontal(|ui| {
-                            self.draw_animal_info(ui, animal);
-                            self.draw_animal_image(ui, ctx, animal, photo_size);
+                if self.app_page % 2 == 1 && self.list_index == 0 {  // Returns first half of animals in animal Vec.
+                    for animal in self.animal_list1.clone() {
+                        ui.group(|ui| {
+                            ui.horizontal(|ui| {
+                                self.draw_animal_info(ui, &animal);
+                                self.draw_animal_image(ui, &animal, photo_size);
+                            });
                         });
-                    });
+                    }
                 }
+                else if self.app_page % 2 == 0 && self.list_index == 1 {  // Returns second half of animals in animal Vec.
+                    for animal in self.animal_list2.clone() {
+                        ui.group(|ui| {
+                            ui.horizontal(|ui| {
+                                self.draw_animal_info(ui, &animal);
+                                self.draw_animal_image(ui, &animal, photo_size);
+                            });
+                        });
+                    }
+                }
+                self.draw_page_nav(ui);
+        });
+    }
 
-                ui.horizontal(|ui| {
-                    ui.button("Prev");
-                    ui.button("Next");
-                });
+    // Displays page navigation and triggers animal search when needed.
+    fn draw_page_nav(&mut self, ui: &mut egui::Ui) {
+
+        ui.horizontal(|ui| {
+            if ui.button("Prev").clicked() {
+                if self.app_page > 1 {
+                    self.app_page -= 1;
+                    self.list_index -= 1;
+
+                    if self.list_index < 0 { // Triggers API to get previous page 
+                        self.list_index = 1;
+                        self.api_page -= 1;
+                        self.start_animal_search();
+                    }
+                }
+            };
+            ui.label(format!("page {}", self.app_page));
+            if ui.button("Next").clicked() {
+                self.app_page += 1;
+                self.list_index += 1;
+
+                if self.list_index > 1 { // Triggers API to get next page once there are no more animals to view in animal Vec.
+                    self.list_index = 0;
+                    self.api_page += 1;
+                    self.start_animal_search();
+                }
+            };
         });
     }
 
@@ -208,12 +272,15 @@ impl Home4PawsApp {
     fn draw_animal_info(&self, ui: &mut egui::Ui, animal: &AnimalData) {
         //animal info for UI
         ui.vertical(|ui|{
-            ui.label(format!("Name: {}", animal.name));
-            ui.label(format!("Breed: {}", animal.breed));
-            ui.label(format!("Age: {}", animal.age));
-            ui.label(format!("Size: {}", animal.size));
-            ui.label(format!("Description: {}", animal.description));
-            ui.label(format!("Location: {}, {}", animal.city, animal.state));
+            ui.label(format!("NAME: {}", animal.name));
+            ui.label(format!("BREED: {}", animal.breed));
+            ui.label(format!("AGE: {}", animal.age));
+            ui.label(format!("SIZE: {}", animal.size));
+            if !animal.good_with.is_empty(){
+                ui.label(format!("{}", animal.good_with));
+            } 
+            ui.label(format!("DESCRIPTION: {}", animal.description));
+            ui.label(format!("LOCATION: {}, {}", animal.city, animal.state));
 
             if animal.url != "Unkown" {
                 ui.hyperlink_to("Learn more about me!", animal.url.clone());
@@ -225,7 +292,7 @@ impl Home4PawsApp {
     }
 
     // Renders an individual animal's image if it's been loaded.
-    fn draw_animal_image(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, animal: &AnimalData, photo_size: f32) {
+    fn draw_animal_image(&mut self, ui: &mut egui::Ui, animal: &AnimalData, photo_size: f32) {
         if let Some(url) = &animal.photo_url {
             let scaled_photo_size = egui::vec2(photo_size, photo_size);
             if let Some(texture) = self.loaded_images.get(url) {
@@ -250,7 +317,7 @@ impl eframe::App for Home4PawsApp {
             }
             self.proccess_animal_response();
             self.proccess_image_receivers(ctx);
-            self.draw_animal_cards(ui, ctx);
+            self.draw_animal_cards(ui);
         });
     }
 }
