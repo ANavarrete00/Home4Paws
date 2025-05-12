@@ -5,7 +5,7 @@
 ## Features
 
 - Search and view adoptable pets with photos and details
-- Filter by pet type (dog, cat, etc.), location, or breed
+- Filter by pet type (dog, cat, etc.), location, or breed (_not implamented yet)_
 - Clean and responsive native UI using `egui`
 - Built-in API key management (with local environment variable support)
 - First-time Rust + GUI project to explore native app development
@@ -29,11 +29,11 @@ cd home4paws
 
 ### API Key
 
-- retrive an API from https://www.petfinder.com/developers/ by creating an account.
+- retrive an API key from https://www.petfinder.com/developers/ by creating an account.
 - Create a .env file in the project root and add your API key:
 ```env
 API_KEY = your_api_key_here
-API_TOKEN = your_token_here
+API_SECRET = your_secret_key_here
 ```
 
 ### Build and Run
