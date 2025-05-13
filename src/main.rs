@@ -8,7 +8,7 @@ use petfinder::{ get_near_animals, get_token, AnimalData };
 use imageloader::{ load_image_bytes, load_color_image_from_bytes };
 use eframe::egui;
 use dotenv::dotenv;
-use egui::{ ColorImage, TextureHandle };
+use egui::{ Align, ColorImage, ScrollArea, TextureHandle };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //read and initalize api key/secret.
@@ -234,37 +234,48 @@ impl Home4PawsApp {
                         });
                     }
                 }
-                self.draw_page_nav(ui);
         });
     }
 
     // Displays page navigation and triggers animal search when needed.
     fn draw_page_nav(&mut self, ui: &mut egui::Ui) {
+        ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
+            let window_width = ui.available_width();
+            let nav_width = 150.0;
+            let pad = (window_width - nav_width).max(0.0) / 2.0;
 
-        ui.horizontal(|ui| {
-            if ui.button("Prev").clicked() {
-                if self.app_page > 1 {
-                    self.app_page -= 1;
-                    self.list_index -= 1;
+            ui.horizontal_centered(|ui| {
+                ui.add_space(pad); // padding to center page nav section
+                
+                // TO-DO: Scroll area not going to top
+                if ui.button("Prev").clicked() { // Button for user to return to previous page of animals
+                    ui.scroll_to_cursor(Some(Align::TOP)); // Scroll to top of scroll area
 
-                    if self.list_index < 0 { // Triggers API to get previous page 
-                        self.list_index = 1;
-                        self.api_page -= 1;
+                    if self.app_page > 1 {
+                        self.app_page -= 1;
+                        self.list_index -= 1;
+
+                        if self.list_index < 0 { // Triggers API to get previous page 
+                            self.list_index = 1;
+                            self.api_page -= 1;
+                            self.start_animal_search();
+                        }
+                    }
+                };
+                ui.label(format!("page {}", self.app_page)); // Display current page number
+
+                if ui.button("Next").clicked() { // Button for user to return to previous page of animals
+                    self.app_page += 1;
+                    self.list_index += 1;
+                    ui.scroll_to_cursor(Some(Align::TOP)); // Scroll to top of scroll area
+
+                    if self.list_index > 1 { // Triggers API to get next page once there are no more animals to view in animal Vec.
+                        self.list_index = 0;
+                        self.api_page += 1;
                         self.start_animal_search();
                     }
-                }
-            };
-            ui.label(format!("page {}", self.app_page));
-            if ui.button("Next").clicked() {
-                self.app_page += 1;
-                self.list_index += 1;
-
-                if self.list_index > 1 { // Triggers API to get next page once there are no more animals to view in animal Vec.
-                    self.list_index = 0;
-                    self.api_page += 1;
-                    self.start_animal_search();
-                }
-            };
+                };
+            });
         });
     }
 
@@ -308,6 +319,10 @@ impl eframe::App for Home4PawsApp {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.heading("Home4Paws - Adopt a New Friend");
             self.draw_search_bar(ui);
+        });
+
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            self.draw_page_nav(ui);
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
