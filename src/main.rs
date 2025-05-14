@@ -66,6 +66,7 @@ struct Home4PawsApp {
     list_index: i32,
     loading: bool,
     start_up: bool,
+    scroll_to_top: bool,
     receiver: Option<mpsc::Receiver<Result<Vec<AnimalData>, String>>>,
     image_receiver: Vec<mpsc::Receiver<(String, Option<ColorImage>)>>,
     images_loading: std::collections::HashSet<String>,
@@ -85,6 +86,7 @@ impl Home4PawsApp {
             list_index: 0,
             loading: true,
             start_up: true,
+            scroll_to_top: false,
             receiver: None,
             image_receiver: Vec::new(),
             images_loading: std::collections::HashSet::new(),
@@ -210,72 +212,66 @@ impl Home4PawsApp {
         self.animal_list2 = self.animal_list1.split_off(split);
         let photo_size = ui.available_width() * 0.2;
 
-        // Scroll Area where the animals are displayed.
-        egui::ScrollArea::vertical()
-            .auto_shrink([false; 2])
-            .show(ui, |ui| {
-                if self.app_page % 2 == 1 && self.list_index == 0 {  // Returns first half of animals in animal Vec.
-                    for animal in self.animal_list1.clone() {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                self.draw_animal_info(ui, &animal);
-                                self.draw_animal_image(ui, &animal, photo_size);
-                            });
-                        });
-                    }
-                }
-                else if self.app_page % 2 == 0 && self.list_index == 1 {  // Returns second half of animals in animal Vec.
-                    for animal in self.animal_list2.clone() {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                self.draw_animal_info(ui, &animal);
-                                self.draw_animal_image(ui, &animal, photo_size);
-                            });
-                        });
-                    }
-                }
-        });
+        if self.app_page % 2 == 1 && self.list_index == 0 {  // Returns first half of animals in animal Vec.
+            for animal in self.animal_list1.clone() {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        self.draw_animal_info(ui, &animal);
+                        self.draw_animal_image(ui, &animal, photo_size);
+                    });
+                });
+            }
+        }
+        else if self.app_page % 2 == 0 && self.list_index == 1 {  // Returns second half of animals in animal Vec.
+            for animal in self.animal_list2.clone() {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        self.draw_animal_info(ui, &animal);
+                        self.draw_animal_image(ui, &animal, photo_size);
+                    });
+                });
+            }
+        }
+        
     }
 
     // Displays page navigation and triggers animal search when needed.
     fn draw_page_nav(&mut self, ui: &mut egui::Ui) {
-        ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-            let window_width = ui.available_width();
-            let nav_width = 150.0;
-            let pad = (window_width - nav_width).max(0.0) / 2.0;
+        let window_width = ui.available_width();
+        let nav_width = 150.0;
+        let pad = (window_width - nav_width).max(0.0) / 2.0;
 
-            ui.horizontal_centered(|ui| {
-                ui.add_space(pad); // padding to center page nav section
-                
-                // TO-DO: Scroll area not going to top
-                if ui.button("Prev").clicked() { // Button for user to return to previous page of animals
-                    ui.scroll_to_cursor(Some(Align::TOP)); // Scroll to top of scroll area
+        ui.horizontal(|ui| {
+            ui.add_space(pad); // padding to center page nav section
+            
+            if ui.button("Prev").clicked() { // Button for user to return to previous page of animals
 
-                    if self.app_page > 1 {
-                        self.app_page -= 1;
-                        self.list_index -= 1;
+                if self.app_page > 1 {
+                    self.app_page -= 1;
+                    self.list_index -= 1;
 
-                        if self.list_index < 0 { // Triggers API to get previous page 
-                            self.list_index = 1;
-                            self.api_page -= 1;
-                            self.start_animal_search();
-                        }
-                    }
-                };
-                ui.label(format!("page {}", self.app_page)); // Display current page number
-
-                if ui.button("Next").clicked() { // Button for user to return to previous page of animals
-                    self.app_page += 1;
-                    self.list_index += 1;
-                    ui.scroll_to_cursor(Some(Align::TOP)); // Scroll to top of scroll area
-
-                    if self.list_index > 1 { // Triggers API to get next page once there are no more animals to view in animal Vec.
-                        self.list_index = 0;
-                        self.api_page += 1;
+                    if self.list_index < 0 { // Triggers API to get previous page 
+                        self.list_index = 1;
+                        self.api_page -= 1;
                         self.start_animal_search();
                     }
-                };
-            });
+                }
+                self.scroll_to_top = true; // Scroll to top of scroll area
+            };
+
+            ui.label(format!("page {}", self.app_page)); // Display current page number
+
+            if ui.button("Next").clicked() { // Button for user to return to previous page of animals
+                self.app_page += 1;
+                self.list_index += 1;
+
+                if self.list_index > 1 { // Triggers API to get next page once there are no more animals to view in animal Vec.
+                    self.list_index = 0;
+                    self.api_page += 1;
+                    self.start_animal_search();
+                }
+                self.scroll_to_top = true; // Scroll to top of scroll area
+            };
         });
     }
 
@@ -321,10 +317,6 @@ impl eframe::App for Home4PawsApp {
             self.draw_search_bar(ui);
         });
 
-        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
-            self.draw_page_nav(ui);
-        });
-
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.start_up {
                 self.load_animal_images(self.animals.clone());
@@ -332,7 +324,17 @@ impl eframe::App for Home4PawsApp {
             }
             self.proccess_animal_response();
             self.proccess_image_receivers(ctx);
-            self.draw_animal_cards(ui);
+            egui::ScrollArea::vertical().id_salt("animal_scroll_area").auto_shrink([false; 2]).show(ui, |ui| { // Scroll area for animal cards
+
+                if self.scroll_to_top {
+                    ui.scroll_to_cursor(Some(egui::Align::TOP));
+                    self.scroll_to_top = false;
+                }
+                self.draw_page_nav(ui);
+                self.draw_animal_cards(ui);
+                ui.separator();
+                self.draw_page_nav(ui);
+            });
         });
     }
 }
