@@ -232,7 +232,6 @@ impl Home4PawsApp {
                 });
             }
         }
-        
     }
 
     // Displays page navigation and triggers animal search when needed.
