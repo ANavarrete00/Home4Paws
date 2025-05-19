@@ -8,7 +8,7 @@ use petfinder::{ get_near_animals, get_token, AnimalData };
 use imageloader::{ load_image_bytes, load_color_image_from_bytes };
 use eframe::egui;
 use dotenv::dotenv;
-use egui::{ Align, ColorImage, ScrollArea, TextureHandle };
+use egui::{ ColorImage, TextureHandle };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //read and initalize api key/secret.

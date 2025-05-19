@@ -14,9 +14,6 @@ pub struct AnimalData {
     pub city: String,
     pub state: String,
     pub good_with: String,
-    pub gw_children: bool,
-    pub gw_dogs: bool,
-    pub gw_cats: bool,
     pub photo_url: Option<String>,
 }
 
@@ -85,7 +82,7 @@ pub async fn get_near_animals(location: &str, token: &str, page: &u32) -> Result
             let photo_url = animal["photos"]
                 .as_array().and_then(|photos| photos.first())
                 .and_then(|photo| photo["medium"].as_str()).map(|s| s.to_string());
-            animals.push(AnimalData { name, breed, description, age, size, url, gw_children, gw_dogs, gw_cats, photo_url, city, state, good_with });
+            animals.push(AnimalData { name, breed, description, age, size, url, photo_url, city, state, good_with });
         }
     } else {
         println!("No animals found.");
