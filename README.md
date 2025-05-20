@@ -11,7 +11,7 @@
 - First-time Rust + GUI project to explore native app development
 
 ## Screenshot
-![alt text](https://github.com/ANavarrete00/Home4Paws/blob/main/src/assets/githubImg-2025-05-14.png "Screenshot of app")
+![screenshot of home page](https://github.com/ANavarrete00/Home4Paws/blob/main/src/assets/GitScreenshots/githubImg-2025-05-14.png "Screenshot of app")
 
 ## Getting Started
 
