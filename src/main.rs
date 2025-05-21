@@ -1,11 +1,11 @@
-#[path = "utils/petfinder.rs"]
+#[path = "petfinder.rs"]
 mod petfinder;
-#[path = "utils/imageloader.rs"]
+#[path = "imageloader.rs"]
 mod imageloader;
-use std::{collections::HashMap, sync::mpsc};
 
+use std::{collections::HashMap, sync::mpsc};
 use petfinder::{ get_near_animals, get_token, AnimalData };
-use imageloader::{ load_image_bytes, load_color_image_from_bytes };
+use imageloader::{ load_image_bytes, load_color_image_from_bytes, load_local_texture };
 use eframe::egui;
 use dotenv::dotenv;
 use egui::{ ColorImage, TextureHandle };
@@ -67,6 +67,7 @@ struct Home4PawsApp {
     loading: bool,
     start_up: bool,
     scroll_to_top: bool,
+    menu_icon: Option<TextureHandle>,
     receiver: Option<mpsc::Receiver<Result<Vec<AnimalData>, String>>>,
     image_receiver: Vec<mpsc::Receiver<(String, Option<ColorImage>)>>,
     images_loading: std::collections::HashSet<String>,
@@ -87,6 +88,7 @@ impl Home4PawsApp {
             loading: true,
             start_up: true,
             scroll_to_top: false,
+            menu_icon: None,
             receiver: None,
             image_receiver: Vec::new(),
             images_loading: std::collections::HashSet::new(),
@@ -112,6 +114,14 @@ impl Home4PawsApp {
                     if self.loading {
                         ui.spinner();
                     }
+
+                    if let Some(texture) = &self.menu_icon {
+                        // TODO: add spacing to float button to right.
+                        if ui.add(egui::ImageButton::new(texture).frame(false)).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                            println!("Menu botton clicked!");
+                        }
+                    }
+                    
                 });
         });
     }
@@ -318,6 +328,14 @@ impl eframe::App for Home4PawsApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.start_up {
+                //load menu button asset
+                if let Ok(texture) = load_local_texture(ctx, "assets/menu-250.png", "menu_button", [32, 32]) {
+                    self.menu_icon = Some(texture);
+                }
+                else {
+                    eprint!("Failed to load menu icon")
+                }
+
                 self.load_animal_images(self.animals.clone());
                 self.start_up = false;
             }
