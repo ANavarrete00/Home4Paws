@@ -1,4 +1,4 @@
-# 🐾 Home4Paws
+# Home4Paws
 
 **Home4Paws** is a desktop application built with Rust and `eframe`/`egui`, designed to help users browse adoptable pets through a clean and responsive interface. It integrates with a public pet adoption API to provide real-time data on available pets, their details, and locations.
 
